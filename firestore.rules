@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /products/{id} {
+      allow read: if true;
+      allow create: if true;  // Allow creating products (for admin page)
+      allow update, delete: if false;  // Prevent updates/deletes from client
+    }
+    match /orders/{id} {
+      allow create: if true;
+      allow read, update, delete: if false;
+    }
+    match /mail/{id} {
+      allow read, write: if false;
+    }
+  }
+}
