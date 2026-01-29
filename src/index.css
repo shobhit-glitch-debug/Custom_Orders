@@ -24,14 +24,70 @@ html {
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background: var(--bg);
+  background:
+    radial-gradient(circle at 15% 15%, rgba(168, 85, 247, 0.25) 0%, transparent 40%),
+    radial-gradient(circle at 85% 20%, rgba(59, 130, 246, 0.2) 0%, transparent 45%),
+    radial-gradient(circle at 50% 80%, rgba(236, 72, 153, 0.18) 0%, transparent 50%),
+    radial-gradient(circle at 20% 70%, rgba(34, 211, 238, 0.15) 0%, transparent 40%),
+    linear-gradient(135deg, #0f0a1e 0%, #1a0b2e 25%, #16213e 50%, #0f172a 75%, #0a0d14 100%);
+  background-attachment: fixed;
+  background-size: 100% 100%;
   color: var(--text);
   line-height: 1.6;
   min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image:
+    repeating-linear-gradient(45deg, transparent, transparent 80px, rgba(255, 255, 255, 0.015) 80px, rgba(255, 255, 255, 0.015) 160px),
+    repeating-linear-gradient(-45deg, transparent, transparent 80px, rgba(255, 255, 255, 0.01) 80px, rgba(255, 255, 255, 0.01) 160px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background:
+    radial-gradient(circle at 30% 40%, rgba(139, 92, 246, 0.08) 0%, transparent 25%),
+    radial-gradient(circle at 70% 60%, rgba(59, 130, 246, 0.06) 0%, transparent 25%);
+  animation: float 20s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+
+  33% {
+    transform: translate(30px, -30px) rotate(5deg);
+  }
+
+  66% {
+    transform: translate(-20px, 20px) rotate(-5deg);
+  }
 }
 
 #root {
   min-height: 100vh;
+  position: relative;
+  z-index: 1;
 }
 
 a {
@@ -48,7 +104,9 @@ button {
   cursor: pointer;
 }
 
-input, select, textarea {
+input,
+select,
+textarea {
   font-family: inherit;
 }
 
@@ -56,6 +114,7 @@ input, select, textarea {
   .review-layout {
     grid-template-columns: 1fr !important;
   }
+
   .review-layout .row-inputs {
     grid-template-columns: 1fr !important;
   }
@@ -70,6 +129,7 @@ input, select, textarea {
 .product-card {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
+
 .product-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25);

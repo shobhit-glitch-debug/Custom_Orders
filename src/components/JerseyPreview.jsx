@@ -1,5 +1,5 @@
 export default function JerseyPreview({ name, number, textColor, isJersey, compact }) {
-  const size = compact ? 120 : 280
+  const size = compact ? 120 : 500
   return (
     <div style={{ display: 'flex', justifyContent: 'center' }}>
       <svg viewBox="0 0 200 240" style={{ width: '100%', maxWidth: size, height: 'auto' }}>
@@ -19,28 +19,28 @@ export default function JerseyPreview({ name, number, textColor, isJersey, compa
         {isJersey && (
           <g>
             <text
-              x="10"
-              y="10"
+              x="100"
+              y={compact ? 50 : 70}
               textAnchor="middle"
-              fontSize={compact ? 32 : 72}
+              fontSize={compact ? 40 : 80}
               fontWeight="900"
               fill={textColor || '#ffffff'}
               fontFamily="'Bebas Neue', 'Impact', sans-serif"
               letterSpacing="3"
             >
-              {number || '0'}
+              {(name || 'NAME').toUpperCase()}
             </text>
             <text
               x="100"
-              y="100"
+              y={compact ? 65 : 95}
               textAnchor="middle"
-              fontSize={compact ? 20 : 36}
+              fontSize={compact ? 14 : 24}
               fontWeight="800"
               fill={textColor || '#ffffff'}
               fontFamily="'Poppins', sans-serif"
               letterSpacing="2"
             >
-              {(name || 'NAME').toUpperCase()}
+              {number || '0'}
             </text>
           </g>
         )}

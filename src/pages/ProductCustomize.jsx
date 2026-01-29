@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 import JerseyPreview from '../components/JerseyPreview'
+import { uploadImageToStorage, generateOrderId } from '../utils/uploadImage'
 
 const MOCK_PRODUCT = { id: 'jersey-1', name: 'Jersey T-Shirt', price: 24.99, type: 'jersey' }
 const TEXT_COLORS = ['#ffffff', '#000000', '#ef4444', '#22c55e', '#3b82f6', '#eab308', '#f97316']
@@ -12,9 +13,11 @@ export default function ProductCustomize() {
   const navigate = useNavigate()
   const [product, setProduct] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
   const [name, setName] = useState('')
   const [number, setNumber] = useState('')
   const [textColor, setTextColor] = useState('#ffffff')
+
 
   useEffect(() => {
     let mounted = true
@@ -42,11 +45,43 @@ export default function ProductCustomize() {
 
   const isJersey = product?.type === 'jersey'
 
-  const handleProceed = () => {
+  const handleProceed = async () => {
+    const orderId = generateOrderId()
+    let capturedBackUrl = null
+    let capturedFrontUrl = null
+
+    // Composite text onto images before navigating
+    try {
+      setUploading(true)
+
+      // Composite back view with customization
+      if (product.backImageUrl && isJersey && (name || number)) {
+        const { compositeTextOnImage } = await import('../utils/compositeImage')
+        const backBlob = await compositeTextOnImage(product.backImageUrl, { name, number, textColor })
+        capturedBackUrl = await uploadImageToStorage(backBlob, `orders/${orderId}/back.png`)
+      }
+
+      // Capture front view if it exists (no customization needed)
+      if (product.frontImageUrl) {
+        // For front view, just fetch and upload the original image
+        const response = await fetch(product.frontImageUrl)
+        const frontBlob = await response.blob()
+        capturedFrontUrl = await uploadImageToStorage(frontBlob, `orders/${orderId}/front.png`)
+      }
+    } catch (error) {
+      console.warn('Failed to composite/upload images:', error.message)
+      // Continue anyway - images are optional
+    } finally {
+      setUploading(false)
+    }
+
     navigate('/review', {
       state: {
         product,
         customization: isJersey ? { name, number, textColor } : null,
+        orderId,
+        capturedBackUrl,
+        capturedFrontUrl,
       },
     })
   }
@@ -72,8 +107,8 @@ export default function ProductCustomize() {
               <img src={product.backImageUrl} alt="Back view" style={styles.backImage} />
               {isJersey && (name || number) && (
                 <div style={styles.overlayText}>
-                  {number && <div style={{ ...styles.numberText, color: textColor }}>{number}</div>}
                   {name && <div style={{ ...styles.nameText, color: textColor }}>{name.toUpperCase()}</div>}
+                  {number && <div style={{ ...styles.numberText, color: textColor }}>{number}</div>}
                 </div>
               )}
             </div>
@@ -94,19 +129,22 @@ export default function ProductCustomize() {
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value.slice(0, 20))}
+                onChange={(e) => setName(e.target.value.toUpperCase().slice(0, 6))}
                 placeholder="e.g. SMITH"
                 style={styles.input}
-                maxLength={20}
+                maxLength={6}
               />
               <label style={styles.label}>Number on back</label>
               <input
                 type="text"
                 value={number}
-                onChange={(e) => setNumber(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                onChange={(e) => {
+                  const num = e.target.value.replace(/\D/g, '')
+                  setNumber(num && parseInt(num) > 99 ? '99' : num)
+                }}
                 placeholder="e.g. 10"
                 style={styles.input}
-                maxLength={3}
+                maxLength={2}
               />
               <label style={styles.label}>Text color</label>
               <div style={styles.colorGrid}>
@@ -129,8 +167,8 @@ export default function ProductCustomize() {
             <p style={styles.noCustom}>This item has no customization options.</p>
           )}
 
-          <button style={styles.proceed} onClick={handleProceed}>
-            Proceed to billing
+          <button style={styles.proceed} onClick={handleProceed} disabled={uploading}>
+            {uploading ? 'Capturing images...' : 'Proceed to billing'}
           </button>
         </div>
       </div>
@@ -148,79 +186,92 @@ const styles = {
   },
   subtitle: { color: 'var(--text-muted)', margin: '0 0 1.5rem' },
   layout: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+    display: 'flex',
+    flexDirection: 'column',
     gap: '2rem',
-    alignItems: 'start',
+    alignItems: 'stretch',
   },
   previewSection: {
     background: 'var(--bg-card)',
     border: '1px solid var(--border)',
     borderRadius: 12,
-    padding: '1.5rem',
-    position: 'sticky',
-    top: '1rem',
+    padding: '2.5rem',
+    minHeight: '1000px',
   },
-  previewLabel: { color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.75rem' },
+  previewLabel: { color: 'var(--text-muted)', fontSize: '1rem', marginBottom: '1rem', fontWeight: 600 },
   backImageContainer: {
     position: 'relative',
-    width: '100%',
-    display: 'flex',
-    justifyContent: 'center',
+    width: '800px',
+    maxWidth: '100%',
+    margin: '0 auto',
   },
   backImage: {
-    maxWidth: '100%',
+    width: '100%',
     height: 'auto',
+    display: 'block',
     borderRadius: 8,
   },
   overlayText: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
+    top: '30%',
+    left: '51%',
     transform: 'translate(-50%, -50%)',
     textAlign: 'center',
     pointerEvents: 'none',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.5rem',
   },
   numberText: {
-    fontSize: '2rem',
-    fontWeight: 700,
+    fontSize: 'clamp(10rem, 10vw, 12rem)',
+    fontWeight: 900,
     fontFamily: 'var(--font-display)',
-    marginBottom: '0.25rem',
+    lineHeight: 1,
+    textShadow: '2px 2px 4px rgba(0,0,0,0.5), -1px -1px 2px rgba(0,0,0,0.3)',
+    letterSpacing: '0.1em',
   },
   nameText: {
-    fontSize: '1rem',
-    fontWeight: 600,
+    fontSize: 'clamp(6rem, 3vw, 8rem)',
+    fontWeight: 700,
     fontFamily: 'var(--font-display)',
+    lineHeight: 1,
+    textShadow: '1px 1px 3px rgba(0,0,0,0.5), -1px -1px 2px rgba(0,0,0,0.3)',
+    letterSpacing: '0.15em',
   },
   formSection: {
     background: 'var(--bg-card)',
     border: '1px solid var(--border)',
     borderRadius: 12,
-    padding: '1.5rem',
+    padding: '1rem',
+    maxWidth: '500px',
+    margin: '0 auto',
   },
-  label: { display: 'block', marginBottom: '0.5rem', fontSize: '0.95rem' },
+  label: { display: 'block', marginBottom: '0.4rem', fontWeight: 500, color: 'var(--text)', fontSize: '0.85rem' },
   input: {
     width: '100%',
-    padding: '0.75rem 1rem',
-    marginBottom: '1rem',
-    background: 'var(--bg-elevated)',
+    padding: '0.6rem',
     border: '1px solid var(--border)',
     borderRadius: 8,
+    background: 'var(--bg)',
     color: 'var(--text)',
-    fontSize: '1rem',
+    fontSize: '0.9rem',
+    marginBottom: '0.8rem',
   },
   colorGrid: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem' },
   colorBtn: { width: 36, height: 36, borderRadius: '50%', padding: 0 },
   noCustom: { color: 'var(--text-muted)', marginBottom: '1.5rem' },
   proceed: {
     width: '100%',
-    padding: '0.9rem 1.25rem',
+    padding: '0.75rem',
     background: 'var(--accent)',
     color: 'white',
     border: 'none',
     borderRadius: 8,
-    fontSize: '1rem',
+    fontSize: '0.9rem',
     fontWeight: 600,
+    cursor: 'pointer',
+    marginTop: '0.8rem',
   },
   skeleton: { color: 'var(--text-muted)', padding: '2rem' },
 }
