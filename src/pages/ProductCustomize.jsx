@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 import JerseyPreview from '../components/JerseyPreview'
 import { uploadImageToStorage, generateOrderId } from '../utils/uploadImage'
+import { generateAITemplate, downloadTemplate } from '../utils/generateAITemplate'
 
 const MOCK_PRODUCT = { id: 'jersey-1', name: 'Jersey T-Shirt', price: 24.99, type: 'jersey' }
 const TEXT_COLORS = ['#ffffff', '#000000', '#ef4444', '#22c55e', '#3b82f6', '#eab308', '#f97316']
@@ -44,6 +45,22 @@ export default function ProductCustomize() {
   }, [productId])
 
   const isJersey = product?.type === 'jersey'
+
+  const handleDownloadTemplate = async () => {
+    if (!name && !number) {
+      alert('Please enter a name or number first')
+      return
+    }
+
+    try {
+      const blob = await generateAITemplate({ name, number, textColor })
+      const filename = `jersey-template-${number || 'custom'}.svg`
+      downloadTemplate(blob, filename)
+    } catch (error) {
+      console.error('Failed to generate template:', error)
+      alert('Failed to generate template. Please try again.')
+    }
+  }
 
   const handleProceed = async () => {
     const orderId = generateOrderId()
@@ -167,6 +184,12 @@ export default function ProductCustomize() {
             <p style={styles.noCustom}>This item has no customization options.</p>
           )}
 
+          {isJersey && (name || number) && (
+            <button style={styles.downloadBtn} onClick={handleDownloadTemplate}>
+              Download Template (AI)
+            </button>
+          )}
+
           <button style={styles.proceed} onClick={handleProceed} disabled={uploading}>
             {uploading ? 'Capturing images...' : 'Proceed to billing'}
           </button>
@@ -213,7 +236,7 @@ const styles = {
   },
   overlayText: {
     position: 'absolute',
-    top: '30%',
+    top: '40%',
     left: '51%',
     transform: 'translate(-50%, -50%)',
     textAlign: 'center',
@@ -224,17 +247,17 @@ const styles = {
     gap: '0.5rem',
   },
   numberText: {
-    fontSize: 'clamp(10rem, 10vw, 12rem)',
+    fontSize: 'clamp(8rem, 10vw, 10rem)',
     fontWeight: 900,
-    fontFamily: 'var(--font-display)',
+    fontFamily: 'var(--font-jersey)',
     lineHeight: 1,
     textShadow: '2px 2px 4px rgba(0,0,0,0.5), -1px -1px 2px rgba(0,0,0,0.3)',
     letterSpacing: '0.1em',
   },
   nameText: {
-    fontSize: 'clamp(6rem, 3vw, 8rem)',
+    fontSize: 'clamp(4rem, 3vw, 6rem)',
     fontWeight: 700,
-    fontFamily: 'var(--font-display)',
+    fontFamily: 'var(--font-jersey)',
     lineHeight: 1,
     textShadow: '1px 1px 3px rgba(0,0,0,0.5), -1px -1px 2px rgba(0,0,0,0.3)',
     letterSpacing: '0.15em',
@@ -261,6 +284,19 @@ const styles = {
   colorGrid: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem' },
   colorBtn: { width: 36, height: 36, borderRadius: '50%', padding: 0 },
   noCustom: { color: 'var(--text-muted)', marginBottom: '1.5rem' },
+  downloadBtn: {
+    width: '100%',
+    padding: '0.75rem',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: 8,
+    fontSize: '0.9rem',
+    fontWeight: 600,
+    cursor: 'pointer',
+    marginTop: '0.8rem',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+  },
   proceed: {
     width: '100%',
     padding: '0.75rem',

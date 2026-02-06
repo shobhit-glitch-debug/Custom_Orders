@@ -13,5 +13,11 @@ service cloud.firestore {
     match /mail/{id} {
       allow read, write: if false;
     }
+    match /stores/{id} {
+      allow read: if true;  // Allow reading stores
+      allow create: if true;  // Allow creating stores (for admin page)
+      allow update: if true;  // Allow updating store emails
+      allow delete: if false;  // Prevent deletes from client
+    }
   }
 }

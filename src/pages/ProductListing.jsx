@@ -85,7 +85,7 @@ export default function ProductListing() {
               </div>
               <div style={styles.cardBody}>
                 <h3 style={styles.cardTitle}>{p.name}</h3>
-                <span style={styles.price}>${Number(p.price || 0).toFixed(2)}</span>
+                <span style={styles.price}>Rs {Number(p.price || 0).toFixed(2)}</span>
               </div>
             </button>
           ))}

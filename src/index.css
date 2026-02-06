@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'KidsTee';
+  src: url('/fonts/KidsTee.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg: #0c0f14;
   --bg-elevated: #131820;
@@ -11,6 +19,7 @@
   --success: #22c55e;
   --font-sans: 'DM Sans', system-ui, sans-serif;
   --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-jersey: 'KidsTee', 'Space Grotesk', system-ui, sans-serif;
 }
 
 * {

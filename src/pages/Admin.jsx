@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { collection, addDoc } from 'firebase/firestore'
+import { useState, useEffect } from 'react'
+import { collection, addDoc, getDocs, updateDoc, doc } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { db, storage } from '../firebase'
 
@@ -97,6 +97,108 @@ export default function Admin() {
   }
 
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }))
+
+  // Store management state - Fixed stores with editable emails
+  const [mackyEmail, setMackyEmail] = useState('')
+  const [jjmEmail, setJjmEmail] = useState('')
+  const [loadingStores, setLoadingStores] = useState(true)
+  const [savingStores, setSavingStores] = useState(false)
+  const [storeSuccess, setStoreSuccess] = useState(false)
+  const [storeError, setStoreError] = useState(null)
+
+  // Fetch store emails on component mount
+  useEffect(() => {
+    if (!db) {
+      setLoadingStores(false)
+      return
+    }
+
+    async function fetchStores() {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'stores'))
+        querySnapshot.docs.forEach((doc) => {
+          const data = doc.data()
+          if (data.name === 'Macky Store') {
+            setMackyEmail(data.email || '')
+          } else if (data.name === 'JJM Printing') {
+            setJjmEmail(data.email || '')
+          }
+        })
+      } catch (err) {
+        console.error('Failed to fetch stores:', err)
+        setStoreError('Failed to load store emails')
+      } finally {
+        setLoadingStores(false)
+      }
+    }
+
+    fetchStores()
+  }, [])
+
+  // Handle store email updates
+  const handleSaveStores = async (e) => {
+    e.preventDefault()
+    if (!db) {
+      setStoreError('Firebase not initialized. Check your .env file.')
+      return
+    }
+
+    setSavingStores(true)
+    setStoreError(null)
+    setStoreSuccess(false)
+
+    try {
+      // Get existing stores
+      const querySnapshot = await getDocs(collection(db, 'stores'))
+      let mackyDocId = null
+      let jjmDocId = null
+
+      querySnapshot.docs.forEach((doc) => {
+        const data = doc.data()
+        if (data.name === 'Macky Store') mackyDocId = doc.id
+        if (data.name === 'JJM Printing') jjmDocId = doc.id
+      })
+
+      // Update or create Macky Store
+      if (mackyEmail.trim()) {
+        if (mackyDocId) {
+          await updateDoc(doc(db, 'stores', mackyDocId), {
+            email: mackyEmail,
+            updatedAt: new Date(),
+          })
+        } else {
+          await addDoc(collection(db, 'stores'), {
+            name: 'Macky Store',
+            email: mackyEmail,
+            createdAt: new Date(),
+          })
+        }
+      }
+
+      // Update or create JJM Printing
+      if (jjmEmail.trim()) {
+        if (jjmDocId) {
+          await updateDoc(doc(db, 'stores', jjmDocId), {
+            email: jjmEmail,
+            updatedAt: new Date(),
+          })
+        } else {
+          await addDoc(collection(db, 'stores'), {
+            name: 'JJM Printing',
+            email: jjmEmail,
+            createdAt: new Date(),
+          })
+        }
+      }
+
+      setStoreSuccess(true)
+      setTimeout(() => setStoreSuccess(false), 3000)
+    } catch (err) {
+      setStoreError(err.message || 'Failed to save store emails')
+    } finally {
+      setSavingStores(false)
+    }
+  }
 
   if (!db || !storage) {
     return (
@@ -248,6 +350,68 @@ export default function Admin() {
           <li>Product appears on the main listing page</li>
         </ol>
       </div>
+
+      {/* Store Management Section */}
+      <div style={{ marginTop: '3rem' }}>
+        <h2 style={styles.sectionTitle}>Store Email Management</h2>
+        <p style={styles.subtitle}>Update email addresses for Macky Store and JJM Printing</p>
+
+        {storeSuccess && (
+          <div style={styles.successBox}>
+            ✓ Store emails saved successfully!
+          </div>
+        )}
+
+        {storeError && (
+          <div style={styles.errorBox}>
+            ✗ {storeError}
+          </div>
+        )}
+
+        {loadingStores ? (
+          <div style={styles.form}>
+            <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>
+              Loading store information...
+            </p>
+          </div>
+        ) : (
+          <form style={styles.form} onSubmit={handleSaveStores}>
+            <div style={styles.storeField}>
+              <label style={styles.label}>Macky Store Email</label>
+              <input
+                type="email"
+                value={mackyEmail}
+                onChange={(e) => setMackyEmail(e.target.value)}
+                style={styles.input}
+                placeholder="Enter Macky Store email"
+              />
+            </div>
+
+            <div style={styles.storeField}>
+              <label style={styles.label}>JJM Printing Email</label>
+              <input
+                type="email"
+                value={jjmEmail}
+                onChange={(e) => setJjmEmail(e.target.value)}
+                style={styles.input}
+                placeholder="Enter JJM Printing email"
+              />
+            </div>
+
+            <button
+              type="submit"
+              style={{
+                ...styles.submit,
+                cursor: savingStores ? 'not-allowed' : 'pointer',
+                opacity: savingStores ? 0.6 : 1,
+              }}
+              disabled={savingStores}
+            >
+              {savingStores ? 'Saving...' : 'Save Store Emails'}
+            </button>
+          </form>
+        )}
+      </div>
     </div>
   )
 }
@@ -352,5 +516,47 @@ const styles = {
     paddingLeft: '1.5rem',
     color: 'var(--text-muted)',
     lineHeight: 1.8,
+  },
+  sectionTitle: {
+    fontFamily: 'var(--font-display)',
+    fontSize: '1.5rem',
+    fontWeight: 700,
+    margin: '0 0 0.5rem',
+  },
+  tableContainer: {
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border)',
+    borderRadius: 12,
+    padding: '1.5rem',
+    marginTop: '1.5rem',
+    overflowX: 'auto',
+  },
+  tableTitle: {
+    margin: '0 0 1rem',
+    fontSize: '1.1rem',
+    fontWeight: 600,
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+  },
+  th: {
+    textAlign: 'left',
+    padding: '0.75rem',
+    borderBottom: '2px solid var(--border)',
+    fontWeight: 600,
+    fontSize: '0.9rem',
+    color: 'var(--text)',
+  },
+  tr: {
+    borderBottom: '1px solid var(--border)',
+  },
+  td: {
+    padding: '0.75rem',
+    fontSize: '0.9rem',
+    color: 'var(--text-muted)',
+  },
+  storeField: {
+    marginBottom: '1rem',
   },
 }

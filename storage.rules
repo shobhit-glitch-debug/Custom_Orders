@@ -6,9 +6,15 @@ service firebase.storage {
       allow read: if true;
     }
     
-    // Allow write access to products folder only
-    match /products/{imageId} {
+    // Allow write access to products folder (for admin uploads)
+    match /products/{fileName} {
       allow write: if request.resource.size < 5 * 1024 * 1024  // Max 5MB
+                   && request.resource.contentType.matches('image/.*');
+    }
+    
+    // Allow write access to orders folder (for customer order images)
+    match /orders/{orderId}/{fileName} {
+      allow write: if request.resource.size < 10 * 1024 * 1024  // Max 10MB
                    && request.resource.contentType.matches('image/.*');
     }
   }

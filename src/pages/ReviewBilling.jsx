@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore'
 import { db } from '../firebase'
 import JerseyPreview from '../components/JerseyPreview'
+import { generateCompositeAI, downloadComposite } from '../utils/generateCompositeAI'
+import { sendOrderEmail } from '../utils/sendOrderEmail'
 
 export default function ReviewBilling() {
   const { state } = useLocation()
@@ -10,6 +12,8 @@ export default function ReviewBilling() {
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
   const [savedToDb, setSavedToDb] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
+  const [emailError, setEmailError] = useState(null)
   const [form, setForm] = useState({
     customerName: '',
     email: '',
@@ -32,10 +36,37 @@ export default function ReviewBilling() {
 
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }))
 
+  const handleDownloadComposite = async () => {
+    if (!product.backImageUrl) {
+      alert('No shirt image available for composite')
+      return
+    }
+
+    if (!customization?.name && !customization?.number) {
+      alert('No customization to add to composite')
+      return
+    }
+
+    try {
+      const blob = await generateCompositeAI({
+        shirtImageUrl: product.backImageUrl,
+        name: customization.name,
+        number: customization.number,
+        textColor: customization.textColor,
+      })
+      const filename = `jersey-composite-${customization.number || 'custom'}.svg`
+      downloadComposite(blob, filename)
+    } catch (error) {
+      console.error('Failed to generate composite:', error)
+      alert('Failed to generate composite. Please try again.')
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!product) return
     setSubmitting(true)
+    setEmailError(null)
 
     // Save order to Firestore with already-captured image URLs
     try {
@@ -53,6 +84,48 @@ export default function ReviewBilling() {
           createdAt: serverTimestamp(),
         })
         setSavedToDb(true)
+
+        // Send email notifications to stores
+        try {
+          // Fetch store emails from Firestore
+          const storesSnapshot = await getDocs(collection(db, 'stores'))
+          const storeEmails = []
+          storesSnapshot.docs.forEach((doc) => {
+            const data = doc.data()
+            if (data.email) {
+              storeEmails.push(data.email)
+            }
+          })
+
+          if (storeEmails.length > 0) {
+            const emailResult = await sendOrderEmail(
+              {
+                orderId: orderId || 'N/A',
+                product: {
+                  name: product.name,
+                  price: product.price,
+                },
+                customization: customization || {},
+                customer: {
+                  name: form.customerName,
+                  email: form.email,
+                  phone: form.phone,
+                  address: `${form.address}, ${form.city}, ${form.state} ${form.zip}`,
+                },
+              },
+              storeEmails
+            )
+
+            if (emailResult.success) {
+              setEmailSent(true)
+            } else {
+              setEmailError(emailResult.error)
+            }
+          }
+        } catch (emailErr) {
+          console.error('Email sending failed:', emailErr)
+          setEmailError('Failed to send email notifications')
+        }
       }
       setDone(true)
     } catch (err) {
@@ -77,6 +150,16 @@ export default function ReviewBilling() {
               ? "Thank you! Your custom order has been saved. We'll send a confirmation to your email."
               : "Thank you! Your order has been received. Add Firebase config in .env to save orders and trigger email notifications."}
           </p>
+          {emailSent && (
+            <p style={{ ...styles.successText, color: 'var(--success)', marginTop: '0.5rem' }}>
+              ✓ Store notifications sent successfully!
+            </p>
+          )}
+          {emailError && (
+            <p style={{ ...styles.successText, color: '#ef4444', marginTop: '0.5rem', fontSize: '0.9rem' }}>
+              ⚠ Note: {emailError}
+            </p>
+          )}
           <button style={styles.backBtn} onClick={() => navigate('/')}>
             Back to products
           </button>
@@ -148,21 +231,28 @@ export default function ReviewBilling() {
                 </span>
               )}
             </div>
+
+            {/* Download Composite Button */}
+            {product.backImageUrl && customization && (customization.name || customization.number) && (
+              <button style={styles.downloadCompositeBtn} onClick={handleDownloadComposite}>
+                Download Composite (AI)
+              </button>
+            )}
           </div>
 
           {/* Totals Section */}
           <div style={styles.totals}>
             <div style={styles.row}>
               <span>Subtotal</span>
-              <span>${price.toFixed(2)}</span>
+              <span>Rs {price.toFixed(2)}</span>
             </div>
             <div style={styles.row}>
               <span>Tax (8%)</span>
-              <span>${tax.toFixed(2)}</span>
+              <span>Rs {tax.toFixed(2)}</span>
             </div>
             <div style={{ ...styles.row, ...styles.totalRow }}>
               <span>Total</span>
-              <span>${total.toFixed(2)}</span>
+              <span>Rs {total.toFixed(2)}</span>
             </div>
           </div>
 
@@ -318,7 +408,7 @@ const styles = {
   numberText: {
     fontSize: 'clamp(3rem, 8vw, 5rem)',
     fontWeight: 900,
-    fontFamily: 'var(--font-display)',
+    fontFamily: 'var(--font-jersey)',
     lineHeight: 1,
     textShadow: '2px 2px 4px rgba(0,0,0,0.5), -1px -1px 2px rgba(0,0,0,0.3)',
     letterSpacing: '0.1em',
@@ -326,13 +416,26 @@ const styles = {
   nameText: {
     fontSize: 'clamp(1.5rem, 3vw, 2.5rem)',
     fontWeight: 700,
-    fontFamily: 'var(--font-display)',
+    fontFamily: 'var(--font-jersey)',
     lineHeight: 1,
     textShadow: '1px 1px 3px rgba(0,0,0,0.5), -1px -1px 2px rgba(0,0,0,0.3)',
     letterSpacing: '0.15em',
   },
   meta: { display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.75rem' },
   metaDetail: { color: 'var(--text-muted)', fontSize: '0.9rem' },
+  downloadCompositeBtn: {
+    width: '100%',
+    padding: '0.75rem',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: 8,
+    fontSize: '0.9rem',
+    fontWeight: 600,
+    cursor: 'pointer',
+    marginTop: '1rem',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+  },
   totals: {
     background: 'var(--bg-card)',
     border: '1px solid var(--border)',

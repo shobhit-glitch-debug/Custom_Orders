@@ -7,6 +7,16 @@
 export async function compositeTextOnImage(imageUrl, customization) {
     const { name, number, textColor } = customization
 
+    // Load the custom font first
+    try {
+        const fontUrl = '/fonts/KidsTee.ttf'
+        const fontFace = new FontFace('KidsTee', `url(${fontUrl})`)
+        await fontFace.load()
+        document.fonts.add(fontFace)
+    } catch (error) {
+        console.warn('Failed to load custom font, using fallback:', error)
+    }
+
     return new Promise((resolve, reject) => {
         const img = new Image()
         img.crossOrigin = 'anonymous'
@@ -38,14 +48,14 @@ export async function compositeTextOnImage(imageUrl, customization) {
 
             // Draw name (if provided) - smaller font
             if (name) {
-                ctx.font = `bold ${canvas.width * 0.05}px "Bebas Neue", Impact, sans-serif`
+                ctx.font = `bold ${canvas.width * 0.05}px "KidsTee", "Space Grotesk", Impact, sans-serif`
                 ctx.fillText(name.toUpperCase(), centerX, topY)
             }
 
             // Draw number (if provided) - smaller font
             if (number) {
                 const numberY = name ? topY + (canvas.width * 0.08) : topY
-                ctx.font = `900 ${canvas.width * 0.12}px "Bebas Neue", Impact, sans-serif`
+                ctx.font = `900 ${canvas.width * 0.12}px "KidsTee", "Space Grotesk", Impact, sans-serif`
                 ctx.fillText(number, centerX, numberY)
             }
 
