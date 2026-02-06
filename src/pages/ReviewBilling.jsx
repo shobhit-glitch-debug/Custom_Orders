@@ -188,15 +188,15 @@ export default function ReviewBilling() {
           <div style={styles.totals}>
             <div style={styles.row}>
               <span>Subtotal</span>
-              <span>${price.toFixed(2)}</span>
+              <span>Rs {price.toFixed(2)}</span>
             </div>
             <div style={styles.row}>
               <span>Tax (8%)</span>
-              <span>${tax.toFixed(2)}</span>
+              <span>Rs {tax.toFixed(2)}</span>
             </div>
             <div style={{ ...styles.row, ...styles.totalRow }}>
               <span>Total</span>
-              <span>${total.toFixed(2)}</span>
+              <span>Rs {total.toFixed(2)}</span>
             </div>
           </div>
 
